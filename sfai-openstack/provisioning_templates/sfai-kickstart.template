@@ -1,0 +1,91 @@
+install
+<%= @mediapath %>
+lang en_US.UTF-8
+selinux --enforcing
+keyboard us
+skipx
+network --bootproto <%= @static ? "static" : "dhcp" %> --hostname <%= @host %>
+rootpw --iscrypted <%= root_pass %>
+firewall --<%= @host.operatingsystem.major.to_i >= 6 ? "service=" : "" %>ssh
+authconfig --useshadow --passalgo=sha256 --kickstart
+timezone UTC
+services --disabled autofs,gpm,sendmail,cups,iptables,ip6tables,auditd,arptables_jf,xfs,pcmcia,isdn,rawdevices,hpoj,bluetooth,openibd,avahi-daemon,avahi-dnsconfd,hidd,hplip,pcscd,restorecond,mcstrans,rhnsd,yum-updatesd
+
+bootloader --location=mbr --append="nofb quiet splash=quiet" <%= grub_pass %>
+key --skip
+
+<% if @dynamic -%>
+%include /tmp/diskpart.cfg
+<% else -%>
+<%= @host.diskLayout %>
+<% end -%>
+
+text
+reboot
+
+%packages --ignoremissing
+yum
+dhclient
+ntp
+wget
+redhat-lsb-core
+@Core
+
+<% if @dynamic -%>
+%pre
+<%= @host.diskLayout %>
+<% end -%>
+
+%post --nochroot
+exec < /dev/tty3 > /dev/tty3
+#changing to VT 3 so that we can see whats going on....
+/usr/bin/chvt 3
+(
+cp -va /etc/resolv.conf /mnt/sysimage/etc/resolv.conf
+/usr/bin/chvt 1
+) 2>&1 | tee /mnt/sysimage/root/install.postnochroot.log
+
+%post
+logger "Starting anaconda <%= @host %> postinstall"
+exec < /dev/tty3 > /dev/tty3
+#changing to VT 3 so that we can see whats going on....
+/usr/bin/chvt 3
+(
+#update local time
+echo "updating system time"
+/usr/sbin/ntpdate -sub <%= @host.params["ntp-server"] || "0.fedora.pool.ntp.org" %>
+/usr/sbin/hwclock --systohc
+
+#<%= snippets "redhat_register" %>
+# Register to RHN and add channels.
+/usr/sbin/rhnreg_ks --username="SolidFireInc" --password="SFPresent1"
+/usr/sbin/rhn-channel -a -c rhel-x86_64-server-6-ost-4 -u "SolidFireInc" -p "SFPresent1"
+# update all the base packages from the updates repository
+yum -t -y -e 0 update
+
+# and add the puppet package
+yum -t -y -e 0 install puppet augeas nc
+cat > /etc/hosts <<EOF
+172.27.30.2    puppet.solidfire.net     puppet
+EOF
+
+echo "Configuring puppet"
+augtool -s <<EOA
+set /files/etc/puppet/puppet.conf/agent/server puppet.solidfire.net
+set /files/etc/puppet/puppet.conf/main/pluginsync true
+EOA
+
+# check in to foreman
+puppet agent --test
+sleep 1
+puppet agent --test
+
+service puppet start
+chkconfig puppet on
+
+# Inform the build system that we are done.
+echo "Informing Foreman that we are built"
+wget -q -O /dev/null --no-check-certificate <%= foreman_url %>
+<%= snippets "SFAI_Networking" %>
+) 2>&1 | tee /root/install.post.log
+exit 0

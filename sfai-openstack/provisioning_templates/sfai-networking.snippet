@@ -1,0 +1,176 @@
+ip_suffix=$(echo <%= @host.ip %> | cut -f4 -d.)
+echo "Using an ip_suffix of: ${ip_suffix}"
+X=( $(grep -r HWADDR /etc/sysconfig/network-scripts/ifcfg-*) )
+
+for line in "${X[@]}"
+do
+  if [[ $line == *em1* ]]; then
+    em1_hwaddr=$(echo $line | cut -f2 -d=)
+  elif [[ $line == *em2* ]]; then
+    em2_hwaddr=$(echo $line | cut -f2 -d=)
+  elif [[ $line == *em3* ]]; then
+    em3_hwaddr=$(echo $line | cut -f2 -d=)
+  elif [[ $line == *em4* ]]; then
+    em4_hwaddr=$(echo $line | cut -f2 -d=)
+  else
+    echo "nuts"
+  fi
+done
+
+cat >> /etc/hosts <<EOF
+172.27.30.2    puppet.solidfire.net    puppet
+172.27.31.16    os-16.solidfire.net     os-16
+172.27.31.15    os-15.solidfire.net     os-15
+172.27.31.14    os-14.solidfire.net     os-14
+172.27.31.13    os-13.solidfire.net     os-13
+172.27.31.12    os-12.solidfire.net     os-12
+172.27.31.11    os-11.solidfire.net     os-11
+172.27.31.10    os-10.solidfire.net     os-10
+172.27.31.9    os-9.solidfire.net       os-9
+172.27.31.8    os-8.solidfire.net       os-8
+172.27.31.7    d-os-7.solidfire.net     d-os-7
+172.27.31.6    d-os-6.solidfire.net     d-os-6
+172.27.31.5    d-os-5.solidfire.net     d-os-5
+172.27.31.4    os-4.solidfire.net       os-4
+172.27.31.3    os-3.solidfire.net       os-3
+172.27.31.2    os-2.solidfire.net       os-2
+172.27.31.1    os-1.solidfire.net       os-1
+172.27.31.21    osc-1.solidfire.net     osc-1
+172.27.31.22    osc-2.solidfire.net     osc-2
+EOF
+
+cat > /etc/sysconfig/network-scripts/ifcfg-em1 <<EOF
+DEVICE=em1
+ONBOOT=yes
+SLAVE=yes
+MASTER=bond0
+HWADDR=$em1_hwaddr
+HOTPLUG=no
+BOOTPROTO=none
+MTU=9000
+EOF
+
+
+cat > /etc/sysconfig/network-scripts/ifcfg-em2 <<EOF
+DEVICE=em2
+ONBOOT=yes
+SLAVE=yes
+MASTER=bond0
+HWADDR=$em2_hwaddr
+HOTPLUG=no
+BOOTPROTO=none
+MTU=9000
+EOF
+
+cat > /etc/sysconfig/network-scripts/ifcfg-em3 <<EOF
+DEVICE=em3
+ONBOOT=yes
+HWADDR=$em3_hwaddr
+SLAVE=yes
+MASTER=bond1
+HOTPLUG=no
+BOOTPROTO=none
+EOF
+
+cat > /etc/sysconfig/network-scripts/ifcfg-em4 <<EOF
+DEVICE=em4
+ONBOOT=yes
+HWADDR=$em4_hwaddr
+SLAVE=yes
+MASTER=bond1
+HOTPLUG=no
+BOOTPROTO=none
+EOF
+
+cat > /etc/sysconfig/network-scripts/ifcfg-bond0 <<EOF
+DEVICE=bond0
+ONBOOT=yes
+BOOTPROTO=none
+USERCTL=no
+NM_CONTROLLED=no
+IPV6INIT=no
+IPV6_AUTOCONF=no
+BONDING_OPTS="mode=1 miimon=100"
+PEERDNS=yes
+DNS1=8.8.8.8
+DNS2=8.8.4.4
+MTU=9000
+EOF
+
+cat > /etc/sysconfig/network-scripts/ifcfg-bond1 <<EOF
+
+DEVICE=bond1
+ONBOOT=yes
+BOOTPROTO=none
+USERCTL=no
+NM_CONTROLLED=no
+IPV6INIT=no
+IPV6_AUTOCONF=no
+BONDING_OPTS="mode=1 miimon=100"
+IPADDR=172.27.30.$ip_suffix
+NETMASK=255.255.255.0
+PEERDNS=yes
+DNS1=8.8.8.8
+DNS2=8.8.4.4
+EOF
+
+cat > /etc/sysconfig/network-scripts/ifcfg-vlan1001 <<EOF
+VLAN=yes
+VLAN_NAME_TYPE=VLAN_PLUS_VID_NO_PAD
+DEVICE=vlan1001
+PHYSDEV=bond0
+BOOTPROTO=none
+ONBOOT=yes
+TYPE=Ethernet
+IPADDR=172.27.31.$ip_suffix
+NETMASK=255.255.255.0
+GATEWAY=172.27.31.254
+IPV6INIT=no
+IPV6_AUTOCONF=no
+EOF
+
+cat > /etc/sysconfig/network-scripts/ifcfg-vlan1002 <<EOF
+VLAN=yes
+VLAN_NAME_TYPE=VLAN_PLUS_VID_NO_PAD
+DEVICE=vlan1002
+PHYSDEV=bond0
+BOOTPROTO=static
+ONBOOT=yes
+TYPE=Ethernet
+IPADDR=172.27.32.$ip_suffix
+NETMASK=255.255.255.0
+IPV6INIT=no
+IPV6_AUTOCONF=no
+EOF
+
+cat > /etc/sysconfig/network-scripts/ifcfg-vlan1003 <<EOF
+VLAN=yes
+VLAN_NAME_TYPE=VLAN_PLUS_VID_NO_PAD
+DEVICE=vlan1003
+PHYSDEV=bond0
+BOOTPROTO=static
+ONBOOT=yes
+TYPE=Ethernet
+IPADDR=172.27.33.$ip_suffix
+NETMASK=255.255.255.0
+IPV6INIT=no
+IPV6_AUTOCONF=no
+EOF
+
+cat > /etc/sysconfig/network-scripts/ifcfg-vlan1004 <<EOF
+VLAN=yes
+VLAN_NAME_TYPE=VLAN_PLUS_VID_NO_PAD
+DEVICE=vlan1004
+PHYSDEV=bond0
+BOOTPROTO=static
+ONBOOT=yes
+TYPE=Ethernet
+IPADDR=172.27.34.$ip_suffix
+NETMASK=255.255.255.0
+IPV6INIT=no
+IPV6_AUTOCONF=no
+EOF
+
+modprobe 8021q
+modprobe ipv6
+modprobe bonding

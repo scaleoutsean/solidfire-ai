@@ -1,0 +1,5 @@
+default linux
+label linux
+IPAPPEND 2
+kernel boot/RedHat-6.5-x86_64-vmlinuz
+append initrd=boot/RedHat-6.5-x86_64-initrd.img ks=http://172.27.30.2/unattended/provision ksdevice="em3" network kssendmac
