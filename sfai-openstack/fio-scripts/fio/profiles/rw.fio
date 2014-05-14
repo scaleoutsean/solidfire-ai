@@ -1,0 +1,14 @@
+[workload]
+bs=8k
+ioengine=libaio
+stonewall=1
+iodepth=16
+size=1g
+numjobs=1
+loops=1000
+direct=1
+runtime=3600
+filename=/tmp/fioiofile
+rw=rw
+rwmixread=80
+rwmixwrite=20
