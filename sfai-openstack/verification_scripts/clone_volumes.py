@@ -20,8 +20,8 @@ def process_options():
     parser = OptionParser(usage, version='%prog 1.0')
 
     parser.add_option('-w', '--wait-for-ready', action='store',
-                      type='bool',
-                      default=True,
+                      type='int',
+                      default=1,
                       dest='wait_for_ready',
                       help='Wait for volumes to become available (default = True).')
 
@@ -90,9 +90,8 @@ def create_template(options, cc):
         print ('Missing parameter to create Template, require: image-id and name')
         sys.exit(1)
     create_start = time.time()
-    import pdb;pdb.set_trace()
     vref = cc.volumes.create(options.volume_size,
-                             display_name=options.volume_base_name,
+                             name=options.volume_base_name,
                              imageRef=options.image_id)
     while cc.volumes.get(vref.id).status != 'available':
         time.sleep(1)
@@ -129,20 +128,21 @@ if __name__ == '__main__':
                     master_vlist.append(v.id)
             refresh_point = refresh_point * 2
         src_id = random.choice(master_vlist)
-        vtype = random.choice(vtype_list)
+        if len(vtype_list) > 0:
+            vtype = random.choice(vtype_list)
         try:
             if options.openstack_version == 'icehouse':
                 vtype.id = None
             created.append(
                 cc.volumes.create(options.volume_size,
                                   display_name='%s-%s' % (options.volume_base_name, i),
-                                  source_volid=src_id,
-                                  volume_type=vtype.id))
+                                  source_volid=src_id))
+                                  #volume_type=vtype.id))
         except Exception as ex:
             print "Error:%s" % ex
             pass
         counter += 1
     print 'Issued API calls to create %s clones.' % counter
     print 'Elapsed time was:%s seconds' % (time.time() - start_time)
-    if options.wait_for_ready:
+    if options.wait_for_ready == 1:
         wait_for_ready(cc, created)
