@@ -28,11 +28,11 @@ VOL_NAME=test-volume
 function create_get_tenant
 {
   local tenant_name=$1
-  local tenant_id=`keystone tenant-list | awk '/\|[[:space:]]*'"$tenant_name"'[[:space:]]*\|.*\|/ {print $2}'`
+  local tenant_id=`keystone tenant-list | awk '/\|[ \t]*'"$tenant_name"'[ \t]*\|.*\|/ {print $2}'`
   if [ -n "$tenant_id" ]; then
     echo $tenant_id
   else
-    keystone tenant-create --name "$tenant_name" | awk '/\|[[:space:]]*id[[:space:]]*\|.*\|/ {print $4}'
+    keystone tenant-create --name "$tenant_name" | awk '/\|[ \t]*id[ \t]*\|.*\|/ {print $4}'
   fi
 }
 
@@ -45,7 +45,7 @@ function delete_tenant
 function get_user_id 
 {
     local user_name=$1
-    keystone user-list | awk '/^\|[^|]*\|[[:space:]]*'"$user_name"'[[:space:]]*\|.*\|/ {print $2}'
+    keystone user-list | awk '/^\|[^|]*\|[ \t]*'"$user_name"'[ \t]*\|.*\|/ {print $2}'
 }
 
 function user_delete
@@ -120,16 +120,16 @@ function backtrace {
 }
 echo "Create and delete verification project and user..."
 tenant_id=`create_get_tenant "verification"`
-user_id=`keystone user-create --name verification --tenant-id "$tenant_id" --pass password --email test@verify.com | awk '/\|[[:space:]]*id[[:space:]]*\|.*\|/ {print $4}'`
+user_id=`keystone user-create --name verification --tenant-id "$tenant_id" --pass password --email test@verify.com | awk '/\|[ \t]*id[ \t]*\|.*\|/ {print $4}'`
 echo `keystone user-delete "$user_id"`
 echo `keystone tenant-delete "$tenant_id"`
 
 echo "Upload cirros test image to glance..."
-ret=`glance image-create --name cirros --is-public True --disk-format qcow2 --container-format bare --location http://download.cirros-cloud.net/0.3.2/cirros-0.3.2-x86_64-disk.img`
+ret=`glance image-create --name cirros-$$ --is-public True --disk-format qcow2 --container-format bare --location http://download.cirros-cloud.net/0.3.2/cirros-0.3.2-x86_64-disk.img`
 printf "%b\n" "$ret"
 
 echo "Boot a test instance..."
-IMAGE=$(glance image-list | egrep "cirros" | get_field 1)
+IMAGE=$(glance image-list | egrep "cirros-$$" | get_field 1)
 die_if_not_set $LINENO IMAGE "Failure getting image $DEFAULT_IMAGE_NAME"
 
 INSTANCE_TYPE=$(nova flavor-list | head -n 4 | tail -n 1 | get_field 1)
