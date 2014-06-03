@@ -24,10 +24,12 @@ if __name__ == '__main__':
     (cc, nc) = init_clients()
 
     ilist = nc.servers.list()
+    print 'instance count is:%s' % len(ilist)
     for i in ilist:
-        if i.status == "error":
-            try:
-                nc.servers.reset_state(i.id, 'active')
-                nc.servers.delete(i.id)
-            except Exception as ex:
-                pass
+        if 'error' not in i.status.lower():
+            nc.servers.reset_state(i.id, 'active')
+        try:
+            nc.servers.delete(i.id)
+        except Exception as ex:
+            print "Caught exception:%s" % ex
+            pass

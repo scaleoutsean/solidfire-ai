@@ -87,6 +87,8 @@ if __name__ == '__main__':
         bdm = {'vda': src_vol.id + ':::0'}
         create_kwargs['block_device_mapping']  = bdm
         try:
+            if src_vol.display_name is None:
+                src_vol.display_name = 'Template-' + str(random.randint(0, options.instance_count))
             nc.servers.create(src_vol.display_name, None, options.flavor_id,  **create_kwargs)
             ready_vlist.remove(src_vol)
         except Exception as ex:

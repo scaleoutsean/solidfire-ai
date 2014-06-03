@@ -26,15 +26,10 @@ if __name__ == '__main__':
     clist = cc.volumes.list()
     print 'volume count is:%s' % len(clist)
     for c in clist:
-        if 'available' not in c.status:
+        if 'available' not in c.status.lower():
             cc.volumes.reset_state(c.id, 'available')
         try:
             cc.volumes.delete(c.id)
         except Exception as ex:
+            print "Caught exception:%s" % ex
             pass
-        else:
-            try:
-                print 'skip'
-            except Exception as ex:
-                print "Caught exception:%s" % ex
-                pass
