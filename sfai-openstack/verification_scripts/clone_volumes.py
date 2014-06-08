@@ -91,7 +91,6 @@ def create_template(options, cc):
         sys.exit(1)
     create_start = time.time()
     vref = cc.volumes.create(options.volume_size,
-                             name=options.volume_base_name,
                              imageRef=options.image_id)
     while cc.volumes.get(vref.id).status != 'available':
         time.sleep(1)
@@ -124,7 +123,7 @@ if __name__ == '__main__':
         if counter == refresh_point:
             vlist = cc.volumes.list(search_opts={'status': 'available'})
             for v in vlist:
-                if options.volume_base_name in v.display_name:
+                if v.display_name and options.volume_base_name in v.display_name:
                     master_vlist.append(v.id)
             refresh_point = refresh_point * 2
         src_id = random.choice(master_vlist)
