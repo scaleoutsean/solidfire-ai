@@ -30,7 +30,8 @@ def process_options():
                       dest='base_name',
                       help='Base name to use, this is the base name '
                            'name for the volume-templates you want to boot. ' 
-                            '(Remember to include delimeter \'-\')')
+                           '(Remember to include delimeter \'-\', you '
+                           'probably dont want to run the template itself)')
 
     # Other tests use random flavors, but this one we MUST specify flavor
     parser.add_option('-f', '--flavors', action='store',

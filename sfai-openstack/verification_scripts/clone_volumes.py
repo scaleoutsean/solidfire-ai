@@ -132,6 +132,9 @@ if __name__ == '__main__':
 
         src_id = random.choice(master_vlist)
         base_name = cc.volumes.get(src_id).display_name
+        if '-' in base_name:
+            base_name = base_name.split('-')[0]
+
         if len(vtype_list) > 0:
             vtype = random.choice(vtype_list)
         try:
