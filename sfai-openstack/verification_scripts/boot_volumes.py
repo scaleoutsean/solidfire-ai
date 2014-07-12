@@ -16,7 +16,7 @@ AUTH_URL = os.getenv('OS_AUTH_URL')
 
 def process_options():
     config = {}
-    usage = "usage: %prog [options]\nverify_setup_deployment.py."
+    usage = "usage: %prog [options]\nboot_volumes.py."
     parser = OptionParser(usage, version='%prog 1.0')
 
     parser.add_option('-c', '--instance-count', action='store',
@@ -25,18 +25,18 @@ def process_options():
                       dest='instance_count',
                       help='Number of instances to boot (default = 100).')
 
-    # Other tests use random flavors, but this one we just use our 100G flavor
-    parser.add_option('-f', '--flavor', action='store',
+    parser.add_option('-n', '--name', action='store',
                       type='string',
-                      default=0,
-                      dest='flavor_id',
-                      help='Instance Flavor ID to use')
+                      dest='base_name',
+                      help='Base name to use, this is the base name '
+                           'name for the volume-templates you want to boot. ' 
+                            '(Remember to include delimeter \'-\')')
 
-    # TODO: Convert to callback
-    parser.add_option('-v', '--volumes', action='store',
+    # Other tests use random flavors, but this one we MUST specify flavor
+    parser.add_option('-f', '--flavors', action='store',
                       type='string',
-                      dest='template_list',
-                      help='Comma seperated list of volume IDs to use as templates.')
+                      dest='flavor_list',
+                      help='Comma seperated list of flavors to choose from') 
 
     (options, args) = parser.parse_args()
     return options
@@ -52,44 +52,32 @@ def init_clients():
 
 if __name__ == '__main__':
 
-    options = process_options()
-    master_vlist = []
-    if options.template_list is None:
-        logging.error('TEMPLATE_LIST is required, try -h for more detail')
-    else:
-       master_vlist = options.template_list.split(',')
-
-    (cc, nc) = init_clients()
-
-    # We'll hit some max clones at first
-    # but after a few complete we should
-    # limit that impact by spreading the job
-    # across multiple volumes
     start_time = time.time()
+    options = process_options()
+    (cc, nc) = init_clients()
     counter = 0
-    instance_start_time = time.time()
-    print('Booting instances after %s secs' % (instance_start_time - start_time))
+    flavor_list = options.flavor_list.split(',')
+
     # Only ask for a fresh list of ready volumes when we need to
     # ie don't grab an update every iteration, no need to and it
     # introduces significant overhead
-
-    counter = 0
-    ready_vlist = cc.volumes.list(search_opts={'status': 'available'})
+    ready_vlist =\
+        [v for v in cc.volumes.list(search_opts={'status': 'available'}) if options.base_name in v.display_name]
     instance_start_time = time.time()
     for i in xrange(options.instance_count):
         if len(ready_vlist) < 1 :
             print('No ready volumes to boot, wait and rescan...')
-            ready_vlist = cc.volumes.list(search_opts={'status': 'available'})
+            ready_vlist =\
+                [v for v in cc.volumes.list(search_opts={'status': 'available'}) if options.base_name in v.display_name]
             counter = 0
             continue
         src_vol = random.choice(ready_vlist)
         create_kwargs = {}
         bdm = {'vda': src_vol.id + ':::0'}
         create_kwargs['block_device_mapping']  = bdm
+        flavor_id = random.choice(flavor_list)
         try:
-            if src_vol.display_name is None:
-                src_vol.display_name = 'Template-' + str(random.randint(0, options.instance_count))
-            nc.servers.create(src_vol.display_name, None, options.flavor_id,  **create_kwargs)
+            nc.servers.create(src_vol.display_name, None, flavor_id,  **create_kwargs)
             ready_vlist.remove(src_vol)
         except Exception as ex:
             print 'Caught exception booting instance: %s' % ex

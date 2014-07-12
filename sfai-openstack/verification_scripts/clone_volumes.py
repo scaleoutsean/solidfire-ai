@@ -56,6 +56,7 @@ def process_options():
 
     parser.add_option('-n', '--name', action='store',
                       type='string',
+                      default='verfication',
                       dest='volume_base_name',
                       help='Base name to use for new template volume (ie: Template)')
 
@@ -118,15 +119,19 @@ if __name__ == '__main__':
     counter = 0
     refresh_point = 10
     created = []
+    
 
     for i in xrange(options.instance_count):
         if counter == refresh_point:
+            created_id_list = [v.id for v in created]
             vlist = cc.volumes.list(search_opts={'status': 'available'})
             for v in vlist:
-                if v.display_name and options.volume_base_name in v.display_name:
+                if v.id in created_id_list:
                     master_vlist.append(v.id)
             refresh_point = refresh_point * 2
+
         src_id = random.choice(master_vlist)
+        base_name = cc.volumes.get(src_id).display_name
         if len(vtype_list) > 0:
             vtype = random.choice(vtype_list)
         try:
@@ -134,9 +139,9 @@ if __name__ == '__main__':
                 vtype.id = None
             created.append(
                 cc.volumes.create(options.volume_size,
-                                  display_name='%s-%s' % (options.volume_base_name, i),
-                                  source_volid=src_id))
-                                  #volume_type=vtype.id))
+                                  display_name='%s-%s' % (base_name, i),
+                                  source_volid=src_id,
+                                  volume_type=vtype.id))
         except Exception as ex:
             print "Error:%s" % ex
             pass
