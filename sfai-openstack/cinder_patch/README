@@ -1,0 +1,10 @@
+This Patch removes thecheck for equality between the volume_type of the source
+and the destination of the clone.  This check was added to prevent the attempt
+to clone from one backend to the next, but now also limits the funcationality 
+of cloning on a single backend. We have this patch to get rid of this check 
+assuming you know what you are doing.  If you try to clone between 2 backends
+something else will not be happy (fail) so be careful.
+
+The plan is to submit a change to Kilo where we will fail this check only if 
+a change of type would cause a clone across backends and then allow the clone
+if the source and destination are the same array. 

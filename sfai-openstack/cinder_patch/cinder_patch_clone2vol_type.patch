@@ -1,0 +1,22 @@
+diff -rupN cinder.orig/volume/api.py cinder/volume/api.py
+--- cinder.orig/volume/api.py	2015-05-07 09:53:45.951019845 -0600
++++ cinder/volume/api.py	2015-04-27 12:22:52.049118864 -0600
+@@ -183,12 +183,12 @@ class API(base.Base):
+                         "must be supported by this consistency group).")
+                 raise exception.InvalidInput(reason=msg)
+ 
+-        if source_volume and volume_type:
+-            if volume_type['id'] != source_volume['volume_type_id']:
+-                msg = _("Invalid volume_type provided (requested type "
+-                        "must match source volume, or be omitted). "
+-                        "You should omit the argument.")
+-                raise exception.InvalidInput(reason=msg)
++#        if source_volume and volume_type:
++#            if volume_type['id'] != source_volume['volume_type_id']:
++#                msg = _("Invalid volume_type provided (requested type "
++#                        "must match source volume, or be omitted). "
++#                        "You should omit the argument.")
++#                raise exception.InvalidInput(reason=msg)
+ 
+         # When cloning replica (for testing), volume type must be omitted
+         if source_replica and volume_type:

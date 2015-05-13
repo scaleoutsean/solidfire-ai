@@ -28,19 +28,31 @@ glance image-create --name 'Ubuntu Precise' --disk-format qcow2 --container-form
 glance image-create --name 'Fedora 20' --disk-format qcow2 --container-format bare --is-public true < Fedora-x86_64-20-20131211.1-sda.qcow2
 glance image-create --name 'CentOS 6.5' --disk-format qcow2 --container-format bare --is-public true < centos-6.5-20140117.0.x86_64.qcow2
 
-echo "Create Volume Types that map to QoS settings..."
-LOW_TYPEID=$(cinder type-create low-iops | grep low-iops | get_field 1)
-MED_TYPEID=$(cinder type-create med-iops | grep med-iops | get_field 1)
-HIGH_TYPEID=$(cinder type-create high-iops | grep high-iops | get_field 1)
+# set VOLUME_BACKEND_NAME to the name of your array
+VOLUME_BACKEND_NAME="SolidFire"
 
-echo "Assigning Extra-Specs to newly created Types..."
-cinder type-key $LOW_TYPEID set qos:minIOPS=800 qos:maxIOPS=1000 qos:burstIOPS=1000
-cinder type-key $MED_TYPEID set qos:minIOPS=1200 qos:maxIOPS=1600 qos:burstIOPS=1600
-cinder type-key $HIGH_TYPEID set qos:minIOPS=1600 qos:maxIOPS=2000 qos:burstIOPS=2000
+# Setup 4 arrays corresponding to your Volume types and QoS settings
+VOL_TYPES=( "mongo1-iops" "mongo2-iops" "mysql-iops" "LAMP-iops" )
+MIN=(        5000          3000          10000        100       )
+MAX=(        10000         8000          20000        1000      )
+BURST=(      15000         10000         40000        2000      )
+
+INDEX=0
+for VOL_TYPE in "${VOL_TYPES[@]}"
+do
+   echo "Create Volume Type: ${VOL_TYPE}"
+   TYPENAME_TYPEID=$(cinder type-create ${VOL_TYPE} | grep ${VOL_TYPE} | get_field 1)
+   echo "Creating QoS Specs"
+   QOS_ID=$(cinder qos-create ${VOL_TYPE} qos:minIOPS=${MIN[${INDEX}]} qos:maxIOPS=${MAX[${INDEX}]} qos:burstIOPS=${BURST[${INDEX}]} | grep id | get_field 2)
+   echo "Setting volume backend name ..."
+   cinder type-key ${TYPENAME_TYPEID} set volume_backend_name=${VOLUME_BACKEND_NAME}
+   echo "Associating QoS specs with volume type .... "
+   cinder qos-associate ${QOS_ID} ${TYPENAME_TYPEID}
+   ((INDEX++))
+done
 
 echo "Created Types and Extra-Specs:"
 cinder extra-specs-list
-
 
 echo "Enable ping/ssh security rules..."
 nova secgroup-add-rule default icmp -1 -1 0.0.0.0/0

@@ -30,14 +30,24 @@ def process_options():
                       dest='base_name',
                       help='Base name to use, this is the base name '
                            'name for the volume-templates you want to boot. ' 
-                           '(Remember to include delimeter \'-\', you '
-                           'probably dont want to run the template itself)')
+                           'you probably dont want to run the template itself)')
 
     # Other tests use random flavors, but this one we MUST specify flavor
     parser.add_option('-f', '--flavors', action='store',
                       type='string',
                       dest='flavor_list',
                       help='Comma seperated list of flavors to choose from') 
+
+    parser.add_option('-t', '--template', action='store',
+                      type='string',
+                      default='-template',
+                      dest='template',
+                      help='The suffix to designate the template (default: -template)')
+
+    parser.add_option('-e', '--network', action='store',
+                      type='string',
+                      dest='net_UUID',
+                      help='The UUID of the network to attach the instances to')
 
     (options, args) = parser.parse_args()
     return options
@@ -63,7 +73,9 @@ if __name__ == '__main__':
     # ie don't grab an update every iteration, no need to and it
     # introduces significant overhead
     ready_vlist =\
-        [v for v in cc.volumes.list(search_opts={'status': 'available'}) if options.base_name in v.display_name]
+        [v for v in cc.volumes.list(search_opts={'status': 'available'}) 
+         if options.base_name in v.display_name
+         if options.template not in v.display_name]
     instance_start_time = time.time()
     for i in xrange(options.instance_count):
         if len(ready_vlist) < 1 :
@@ -76,6 +88,7 @@ if __name__ == '__main__':
         create_kwargs = {}
         bdm = {'vda': src_vol.id + ':::0'}
         create_kwargs['block_device_mapping']  = bdm
+        create_kwargs['nics'] = [{ 'net-id': options.net_UUID }]
         flavor_id = random.choice(flavor_list)
         try:
             nc.servers.create(src_vol.display_name, None, flavor_id,  **create_kwargs)
@@ -91,7 +104,8 @@ if __name__ == '__main__':
     # Now we just have to wait for the instances to become ACTIVE
     done_count = 0
     while done_count < options.instance_count:
-        active_list = nc.servers.list(search_opts={'status': 'ACTIVE'})
+        active_list = [s for s in nc.servers.list(search_opts={'status': 'ACTIVE'})
+                       if options.base_name in s.name]
         error_list = nc.servers.list(search_opts={'status': 'ERROR'})
         done_count = len(active_list) + len(error_list)
         print "    Active/Ready Instances: %s" % len(active_list)

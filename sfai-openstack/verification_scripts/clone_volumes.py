@@ -52,13 +52,18 @@ def process_options():
     parser.add_option('-i', '--image-id', action='store',
                       type='string',
                       dest='image_id',
-                      help='Imaged ID to use if creating the template (not specifying a Templat list)')
+                      help='Imaged ID to use if creating the template (not specifying a Template list)')
 
     parser.add_option('-n', '--name', action='store',
                       type='string',
                       default='verfication',
                       dest='volume_base_name',
-                      help='Base name to use for new template volume (ie: Template)')
+                      help='Base name to use for new template volume ( -template will be added)')
+
+    parser.add_option('-t', '--type', action='store',
+                      type='string',
+                      dest='vol_type',
+                      help='Volume Type to use for new template volume (default: random vol_type)')
 
     (options, args) = parser.parse_args()
     return options
@@ -75,7 +80,9 @@ def init_clients():
 def wait_for_ready(cc, volume_list):
     ready_count = 0
     error_count = 0
-    while ready_count + error_count < len(volume_list):
+    wait_for = len(volume_list)
+    error_list = []
+    while ready_count + error_count < wait_for:
         for v in volume_list:
             status = cc.volumes.get(v.id).status
             if status == 'available':
@@ -84,7 +91,10 @@ def wait_for_ready(cc, volume_list):
             if 'error' in status:
                 error_count += 1
                 volume_list.remove(v)
+                error_list.append(v)
         time.sleep(1)
+    print 'Avaliable: %s Error %s' % (ready_count, error_count)
+    return error_list
 
 def create_template(options, cc):
     if options.image_id is None or options.volume_base_name is None:
@@ -92,6 +102,8 @@ def create_template(options, cc):
         sys.exit(1)
     create_start = time.time()
     vref = cc.volumes.create(options.volume_size,
+                             display_name=options.volume_base_name + "-template",
+                             volume_type=options.vol_type,
                              imageRef=options.image_id)
     while cc.volumes.get(vref.id).status != 'available':
         time.sleep(1)
@@ -115,7 +127,6 @@ if __name__ == '__main__':
     # limit that impact by spreading the job
     # across multiple volumes
     start_time = time.time()
-    vtype_list = cc.volume_types.list()
     counter = 0
     refresh_point = 10
     created = []
@@ -132,24 +143,41 @@ if __name__ == '__main__':
 
         src_id = random.choice(master_vlist)
         base_name = cc.volumes.get(src_id).display_name
-        if '-' in base_name:
+        if options.volume_base_name: 
+            base_name = options.volume_base_name
+        elif '-' in base_name:
             base_name = base_name.split('-')[0]
 
-        if len(vtype_list) > 0:
-            vtype = random.choice(vtype_list)
         try:
-            if options.openstack_version == 'icehouse':
-                vtype.id = None
             created.append(
                 cc.volumes.create(options.volume_size,
                                   display_name='%s-%s' % (base_name, i),
-                                  source_volid=src_id,
-                                  volume_type=vtype.id))
+                                  volume_type=options.vol_type,
+                                  source_volid=src_id,))
         except Exception as ex:
             print "Error:%s" % ex
             pass
         counter += 1
+
     print 'Issued API calls to create %s clones.' % counter
-    print 'Elapsed time was:%s seconds' % (time.time() - start_time)
+    print 'Elapsed API time was:%s seconds' % (time.time() - start_time)
+    print 'Waiting for %s volumes to become "avaliable"' % len(created)
     if options.wait_for_ready == 1:
-        wait_for_ready(cc, created)
+        err_list = wait_for_ready(cc, created)
+        """
+        while err_list:
+            created = []
+            for err in err_list:
+                cc.volumes.delete(err.id)
+                try:
+                    created.append(
+                        cc.volumes.create(options.volume_size,
+                                          display_name='%s' % (err.display_name),
+                                          volume_type=options.vol_type,
+                                          source_volid=src_id,))
+                except Exception as ex:
+                    print "Error:%s" % ex
+                    pass
+            err_list = wait_for_ready(cc, created)
+        """
+    print 'Total time was:%s seconds' % (time.time() - start_time)
