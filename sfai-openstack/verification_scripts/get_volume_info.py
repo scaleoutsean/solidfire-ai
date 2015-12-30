@@ -3,7 +3,7 @@
 import os
 
 from cinderclient import client as cinderclient
-from novaclient.v1_1 import client as novaclient
+from novaclient.v2 import client as novaclient
 
 USER = os.getenv('OS_USERNAME')
 TENANT = os.getenv('OS_TENANT_NAME')
@@ -11,7 +11,7 @@ PASSWORD = os.getenv('OS_PASSWORD')
 AUTH_URL = os.getenv('OS_AUTH_URL')
 
 def init_clients():
-    cc = cinderclient.Client('1', USER,
+    cc = cinderclient.Client('2', USER,
                               PASSWORD, TENANT,
                               AUTH_URL)
     nc = novaclient.Client(USER, PASSWORD,

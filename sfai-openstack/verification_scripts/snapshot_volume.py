@@ -7,7 +7,7 @@ import random
 import time
 
 from cinderclient import client as cinderclient
-from novaclient.v1_1 import client as novaclient
+from novaclient.v2 import client as novaclient
 
 USER = os.getenv('OS_USERNAME')
 TENANT = os.getenv('OS_TENANT_NAME')
@@ -21,6 +21,7 @@ def process_options():
 
     parser.add_option('-n', '--name', action='store',
                       type='string',
+                      default='verification-snapshot',
                       dest='name')
 
     parser.add_option('-f', '--force', action='store',
@@ -36,7 +37,7 @@ def process_options():
     return options
 
 def init_clients():
-    cc = cinderclient.Client('1', USER,
+    cc = cinderclient.Client('2', USER,
                               PASSWORD, TENANT,
                               AUTH_URL)
     nc = novaclient.Client(USER, PASSWORD,
@@ -51,4 +52,4 @@ if __name__ == '__main__':
     (cc, nc) = init_clients()
     cc.volume_snapshots.create(options.volume,
                        force=options.force, 
-                       display_name=options.name)
+                       name=options.name)

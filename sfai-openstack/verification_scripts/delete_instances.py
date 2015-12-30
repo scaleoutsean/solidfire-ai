@@ -4,7 +4,7 @@ from optparse import OptionParser
 import os
 
 from cinderclient import client as cinderclient
-from novaclient.v1_1 import client as novaclient
+from novaclient.v2 import client as novaclient
 
 USER = os.getenv('OS_USERNAME')
 TENANT = os.getenv('OS_TENANT_NAME')
@@ -19,13 +19,14 @@ def process_options():
     parser.add_option('-n', '--name', action='store',
                       type='string',
                       dest='name',
+                      default='verification',
                       help='Base Name of instances to delete')
 
     (options, args) = parser.parse_args()
     return options
 
 def init_clients():
-    cc = cinderclient.Client('1', USER,
+    cc = cinderclient.Client('2', USER,
                               PASSWORD, TENANT,
                               AUTH_URL)
     nc = novaclient.Client(USER, PASSWORD,
@@ -42,8 +43,12 @@ if __name__ == '__main__':
     print 'instance count is:%s' % len(ilist)
     for i in ilist:
         if options.name == 'all' or options.name in i.name:
-            if 'error' not in i.status.lower():
-                nc.servers.reset_state(i.id, 'active')
+            if 'error' in i.status.lower():
+                try:
+                    nc.servers.reset_state(i.id, 'active')
+                except:
+                    print "Could not reset state of errored VM."
+                    pass
             try:
                 nc.servers.delete(i.id)
             except Exception as ex:

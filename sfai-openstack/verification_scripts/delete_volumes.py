@@ -4,7 +4,7 @@ from optparse import OptionParser
 import os
 
 from cinderclient import client as cinderclient
-from novaclient.v1_1 import client as novaclient
+from novaclient.v2 import client as novaclient
 
 USER = os.getenv('OS_USERNAME')
 TENANT = os.getenv('OS_TENANT_NAME')
@@ -19,6 +19,7 @@ def process_options():
     parser.add_option('-n', '--name', action='store',
                       type='string',
                       dest='name',
+                      default='verification',
                       help='Base Name of instances volumes to delete. Use \'all\' '
                            'to remove all volumes on the system.  '
                            '(Remember to include the delimeter \'-\') ')
@@ -38,7 +39,7 @@ def process_options():
     return options
 
 def init_clients():
-    cc = cinderclient.Client('1', USER,
+    cc = cinderclient.Client('2', USER,
                               PASSWORD, TENANT,
                               AUTH_URL)
     nc = novaclient.Client(USER, PASSWORD,
@@ -53,20 +54,21 @@ if __name__ == '__main__':
 
     vlist = cc.volumes.list()
     for v in vlist:
-        if options.name == 'all' or (options.name in v.display_name and options.template not in v.display_name):
-            if 'available' not in v.status.lower():
-                cc.volumes.reset_state(v.id, 'available')
-            try:
-                cc.volumes.delete(v.id)
-            except Exception as ex:
-                print "Caught exception:%s" % ex
-                pass
+        if v.name:
+            if options.name == 'all' or (options.name in v.name and options.template not in v.name):
+                if 'available' not in v.status.lower():
+                    cc.volumes.reset_state(v.id, 'available')
+                try:
+                    cc.volumes.delete(v.id)
+                except Exception as ex:
+                    print "Caught exception:%s" % ex
+                    pass
     if options.delete_template:
         name ='%s-%s' % (options.name,options.template)
         print ('Deleting Template ... %s' % name)
         vlist = cc.volumes.list()
         for v in vlist:
-            if name in v.display_name:
+            if name in v.name:
                 if 'available' not in v.status.lower():
                     cc.volumes.reset_state(v.id, 'available')
                 try:

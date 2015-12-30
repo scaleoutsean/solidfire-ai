@@ -1,8 +1,9 @@
 #!/usr/bin/python
 
-""" This programe will clone volumes to make a number of bootable volumes
-    In this program's case, it will either create a template if one is not given
-    or clone from a given template. 
+""" this program will create a number of bootable volumes from
+    images stored in Glance. It will not clone the volumes, but 
+    continue to use whatever mechanism is configured to get the images 
+    from Glance, including any image caching configured.
 """
 
 import os
@@ -22,7 +23,7 @@ AUTH_URL = os.getenv('OS_AUTH_URL')
 def process_options():
     config = {}
     usage = "usage: %prog [options]\nverify_setup_deployment.py."
-    parser = OptionParser(usage, version='%prog 2.0')
+    parser = OptionParser(usage, version='%prog 1.0')
 
     parser.add_option('-w', '--wait-for-ready', action='store',
                       type='int',
@@ -41,12 +42,6 @@ def process_options():
                       default='10',
                       dest='volume_size',
                       help='Size of volume to create for template')
-
-    # TODO: Convert to callback
-    parser.add_option('-v', '--volumes', action='store',
-                      type='string',
-                      dest='template_list',
-                      help='Comma seperated list of volume IDs to use as templates (omit to create a template).')
 
     parser.add_option('-i', '--image-id', action='store',
                       type='string',
@@ -96,36 +91,10 @@ def wait_for_ready(cc, volume_list):
     print 'Avaliable: %s Error %s' % (ready_count, error_count)
     return return_list, error_list
 
-def create_template(options, cc):
-    if options.image_id is None or options.volume_base_name is None:
-        print ('Missing parameter to create Template, require: image-id and name')
-        sys.exit(1)
-    create_start = time.time()
-    vref = cc.volumes.create(options.volume_size,
-                             name=options.volume_base_name + "-template",
-                             imageRef=options.image_id)
-    while cc.volumes.get(vref.id).status != 'available':
-        time.sleep(1)
-    if options.vol_type:
-        cc.volumes.retype(volume=vref.id,
-                          volume_type=options.vol_type,
-                          policy='never')
-    while cc.volumes.get(vref.id).status != 'available':
-        time.sleep(1)
-    print "Template volume ready after %s seconds." % (time.time() - create_start)
-    return vref.id
-
 if __name__ == '__main__':
 
     options = process_options()
-    master_vlist = []
     (cc, nc) = init_clients()
-    if options.template_list is None:
-        print ('No Template list provided, attempting to create a template...')
-        master_vlist.append(create_template(options, cc))
-    else:
-       master_vlist = options.template_list.split(',')
-
 
     # We'll hit some max clones at first
     # but after a few complete we should
@@ -135,12 +104,6 @@ if __name__ == '__main__':
     counter = 0
     refresh_point = 10
     created = []
-    # making this script work for non-hacked OpenStack, means 2 steps to
-    # changing vol_type on a clone, so we have to wait for ready to do that.
-    # this is fixed in Liberty
-    if options.vol_type:
-        options.wait_for_ready=1
-    
 
     for i in xrange(options.instance_count):
         if counter == refresh_point:
@@ -151,24 +114,21 @@ if __name__ == '__main__':
                     master_vlist.append(v.id)
             refresh_point = refresh_point * 2
 
-        src_id = random.choice(master_vlist)
-        base_name = cc.volumes.get(src_id).name
-        if options.volume_base_name: 
-            base_name = options.volume_base_name
-        elif '-' in base_name:
-            base_name = base_name.split('-')[0]
+        base_name = options.volume_base_name
 
         try:
             created.append(
                 cc.volumes.create(options.volume_size,
                                   name='%s-%s' % (base_name, i),
-                                  source_volid=src_id,))
+                                  volume_type=options.vol_type,
+                                  imageRef=options.image_id,))
+
         except Exception as ex:
             print "Error:%s" % ex
             pass
         counter += 1
 
-    print 'Issued API calls to create %s clones.' % counter
+    print 'Issued API calls to create %s volumes.' % counter
     print 'Elapsed API time was:%s seconds' % (time.time() - start_time)
     print 'Waiting for %s volumes to become "avaliable"' % len(created)
     if options.wait_for_ready == 1:
@@ -182,7 +142,8 @@ if __name__ == '__main__':
                     created_err.append(
                         cc.volumes.create(options.volume_size,
                                           name='%s' % (err.name),
-                                          source_volid=src_id,))
+                                          volume_type=options.vol_type,
+                                          imageRef=options.image_id,))
                 except Exception as ex:
                     print "Error:%s" % ex
                     pass
@@ -190,12 +151,5 @@ if __name__ == '__main__':
             for v in created_err:
                 created.append(v)
     
-    if options.vol_type:
-        print 'Retyping volumes...'
-        if cc.volumes.get(src_id).volume_type != options.vol_type:
-            for vol in created:
-                cc.volumes.retype(volume=vol.id,
-                                  volume_type=options.vol_type,
-                                  policy='never')
     print 'Total time was:%s seconds' % (time.time() - start_time)
 
