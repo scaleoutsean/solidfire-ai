@@ -27,20 +27,26 @@ glance image-create --name 'CentOS 6' --disk-format qcow2 --container-format bar
 glance image-create --name 'CentOS 7' --disk-format qcow2 --container-format bare --is-public true --copy-from $CENTOS7_URL --progress
 #glance image-create --name 'Windows2012R2-Eval' --disk-format qcow2 --container-format bare --is-public true --file $WINDOWS_IMG_FILE --progress
 
+# --- setup Volume Types ---
 # set VOLUME_BACKEND_NAME to the name of your array
 VOLUME_BACKEND_NAME="solidfire"
 
+cinder type-create solidfire
+cinder type-key solidfire set volume_backend_name=$VOLUME_BACKEND_NAME
+
 # Setup 4 arrays corresponding to your Volume types and QoS settings
 VOL_TYPES=( "silver" "bronze" "gold" "webserver" "platinum" )
-MIN=(        2500    1000      5000   100        "10000"    )
-MAX=(        5000    2000      10000  1000       "20000"    )
-BURST=(      7000    2500      15000  2000       "25000"    )
+DESCRIPTION=( '$[$1.12/GB/month]' '$[0.50/GB/month]' '[$2.10/GB/month]' '[$0.35/GB/month]' '[$3.00/GB/month]' )
+MIN=(        500    100      1000   100       2000    )
+MAX=(        800    200      1500  1000       2400    )
+BURST=(      900    250      1700  1500       2500    )
 
 INDEX=0
 for VOL_TYPE in "${VOL_TYPES[@]}"
 do
    echo "Create Volume Type: ${VOL_TYPE}"
-   TYPENAME_TYPEID=$(cinder type-create ${VOL_TYPE} | grep ${VOL_TYPE} | get_field 1)
+   TYPE_DESC="IOPS=${MIN[${INDEX}]}/${MAX[${INDEX}]}/${BURST[${INDEX}]} ${DESCRIPTION[${INDEX}]}"
+   TYPENAME_TYPEID=$(cinder type-create --description "${TYPE_DESC}" ${VOL_TYPE} | grep ${VOL_TYPE} | get_field 1)
    echo "Creating QoS Specs"
    QOS_ID=$(cinder qos-create ${VOL_TYPE}-qos qos:minIOPS=${MIN[${INDEX}]} qos:maxIOPS=${MAX[${INDEX}]} qos:burstIOPS=${BURST[${INDEX}]} | grep id | get_field 2)
    echo "Setting volume backend name ..."
